@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Settle Up</title>
+<style>
+  :root {
+    --ink: #2c2333; --paper: #efe8db; --paper-2: #e3d9c4; --line: #c6b99b;
+    --gold: #b0812f; --owe: #a5462f; --get: #4a7850; --muted: #75694f;
+    --plum: #6a3f5c; --teal: #2b625d;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #ece4d8; --paper: #1c1720; --paper-2: #271f2b;
+      --line: #453a44; --gold: #d6a555; --owe: #e08267; --get: #7fb98d; --muted: #a99b8c;
+      --plum: #b787a8; --teal: #6fb0a6;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #ece4d8; --paper: #1c1720; --paper-2: #271f2b;
+    --line: #453a44; --gold: #d6a555; --owe: #e08267; --get: #7fb98d; --muted: #a99b8c;
+    --plum: #b787a8; --teal: #6fb0a6;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif;
+    display: flex; justify-content: center; padding: 32px 16px;
+  }
+  .sheet { width: 100%; max-width: 560px; }
+  h1 { font-size: 1.7rem; font-weight: 400; letter-spacing: 0.01em; margin: 0 0 4px; color: var(--plum); }
+  .sub { color: var(--muted); font-size: 0.95rem; margin: 0 0 26px; line-height: 1.4; }
+  .card { background: var(--paper-2); border: 1px solid var(--line); border-left: 4px solid var(--teal); border-radius: 6px; padding: 22px; margin-bottom: 18px; }
+  .card.accent-plum { border-left-color: var(--plum); }
+  .card.accent-gold { border-left-color: var(--gold); }
+  label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+  input[type="number"], input[type="text"] {
+    width: 100%; font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 1rem;
+    padding: 10px 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--paper); color: var(--ink);
+  }
+  input:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+  input:disabled { opacity: 0.5; }
+  button {
+    font-family: inherit; font-size: 0.95rem; padding: 11px 20px; border-radius: 4px;
+    border: 1px solid var(--gold); background: transparent; color: var(--gold); cursor: pointer;
+  }
+  button.primary { background: var(--gold); color: var(--paper); border: 1px solid var(--gold); }
+  button:hover { opacity: 0.85; }
+  .actions { display: flex; gap: 10px; margin-top: 16px; }
+  .step-back { background: none; border: none; color: var(--muted); text-decoration: underline; padding: 0; margin-bottom: 14px; cursor: pointer; font-size: 0.9rem; }
+  .home-link { background: none; border: none; color: var(--muted); text-decoration: underline; padding: 0; margin-bottom: 16px; cursor: pointer; font-size: 0.85rem; display: inline-block; }
+  .home-link:hover { color: var(--gold); }
+
+  .mode-grid { display: flex; flex-direction: column; gap: 14px; }
+  .mode-card { text-align: left; padding: 20px; border-radius: 6px; border: 1px solid var(--line); border-left: 4px solid var(--teal); background: var(--paper-2); cursor: pointer; color: var(--ink); width: 100%; }
+  .mode-card.accent-plum { border-left-color: var(--plum); }
+  .mode-card:hover { border-color: var(--gold); border-left-color: var(--gold); }
+  .mode-card h2 { margin: 0 0 6px; font-size: 1.1rem; font-weight: 600; }
+  .mode-card.accent-plum h2 { color: var(--plum); }
+  .mode-card:not(.accent-plum) h2 { color: var(--teal); }
+  .mode-card p { margin: 0; color: var(--muted); font-size: 0.9rem; line-height: 1.4; }
+
+  .row { display: flex; gap: 10px; margin-bottom: 10px; }
+  .row .name { flex: 1.4; } .row .amt { flex: 1; }
+  .row .name input { font-family: Georgia, serif; }
+  .row .amt input { font-family: ui-monospace, 'SF Mono', Consolas, monospace; }
+  .col-labels { display: flex; gap: 10px; margin-bottom: 6px; }
+  .col-labels span { flex: 1.4; font-size: 0.8rem; color: var(--muted); }
+  .col-labels span:last-child { flex: 1; }
+
+  .person-card { border: 1px solid var(--line); border-left: 3px solid var(--teal); border-radius: 5px; padding: 14px; margin-bottom: 12px; background: var(--paper); }
+  .person-card.excluded { opacity: 0.6; border-left-color: var(--line); }
+  .p-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .p-grid label { margin-bottom: 4px; }
+  .p-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+  .weight-wrap { display: flex; align-items: center; gap: 6px; }
+  .weight-wrap span { color: var(--muted); font-size: 0.9rem; }
+  .switch-wrap { display: flex; align-items: center; gap: 8px; }
+  .switch { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider-pill { position: absolute; inset: 0; background: var(--line); border-radius: 22px; cursor: pointer; transition: 0.15s; }
+  .slider-pill:before { content: ""; position: absolute; height: 16px; width: 16px; left: 3px; top: 3px; background: var(--paper-2); border-radius: 50%; transition: 0.15s; }
+  .switch input:checked + .slider-pill { background: var(--get); }
+  .switch input:checked + .slider-pill:before { transform: translateX(18px); }
+  .switch-label { font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
+
+  .total-line { display: flex; justify-content: space-between; font-size: 0.95rem; padding-top: 12px; margin-top: 4px; border-top: 1px dashed var(--line); color: var(--muted); }
+  .total-line b { color: var(--ink); font-family: ui-monospace, monospace; }
+
+  .section-title { font-size: 0.95rem; margin-bottom: 12px; color: var(--ink); font-weight: 600; }
+  .note { font-size: 0.82rem; color: var(--muted); margin: -4px 0 12px; line-height: 1.4; }
+  .note.warn { color: var(--owe); }
+
+  table.ledger { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+  table.ledger th, table.ledger td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+  table.ledger th { color: var(--muted); font-weight: 400; font-size: 0.8rem; }
+  table.ledger td.num, table.ledger th.num { font-family: ui-monospace, monospace; }
+  table.ledger tfoot td { border-bottom: none; border-top: 1px solid var(--ink); font-weight: 600; }
+  .tag { font-size: 0.75rem; padding: 2px 7px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); }
+  .tag.on { color: var(--get); border-color: var(--get); }
+  .tag.off { color: var(--owe); border-color: var(--owe); }
+
+  .balance-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 0.95rem; }
+  .balance-row:last-child { border-bottom: none; }
+  .balance-row .amt { font-family: ui-monospace, monospace; }
+
+  .tx-list { list-style: none; padding: 0; margin: 0; }
+  .tx { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .tx:last-child { border-bottom: none; }
+  .tx .arrow { color: var(--muted); margin: 0 8px; font-size: 0.9rem; }
+  .tx .amount { font-family: ui-monospace, monospace; color: var(--gold); font-weight: 600; }
+  .empty-note { color: var(--muted); font-size: 0.9rem; text-align: center; padding: 8px 0; }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <button class="home-link" id="homeBtn">&#8962; Home</button>
+  <h1>Settle Up</h1>
+  <p class="sub">Split a shared bill and find the fewest payments needed to even everyone out.</p>
+
+  <div id="stepMode">
+    <div class="mode-grid">
+      <button class="mode-card" id="pickBasic">
+        <h2>Basic</h2>
+        <p>Everyone splits the total equally. Just enter names and what each person spent.</p>
+      </button>
+      <button class="mode-card accent-plum" id="pickAdvanced">
+        <h2>Advanced</h2>
+        <p>Give people different shares of the bill (weights), and exclude anyone who doesn't need to pay or be paid further.</p>
+      </button>
+    </div>
+  </div>
+
+  <div id="stepCount" style="display:none">
+    <button class="step-back" id="backMode">&larr; Change mode</button>
+    <div class="card">
+      <label for="count">How many people?</label>
+      <input type="number" id="count" min="2" max="30" placeholder="e.g. 6" />
+      <div class="actions"><button class="primary" id="toEntry">Continue</button></div>
+    </div>
+  </div>
+
+  <div id="stepEntry" style="display:none">
+    <button class="step-back" id="backCount">&larr; Change number of people</button>
+    <div class="card">
+      <div id="basicRows"></div>
+      <div id="advancedRows"></div>
+      <div id="weightLeftoverNote" class="note warn" style="display:none"></div>
+      <div class="total-line">Total spent <b id="totalSpent">0</b></div>
+    </div>
+    <div class="actions"><button class="primary" id="toResults">Calculate split</button></div>
+  </div>
+
+  <div id="stepResults" style="display:none">
+    <button class="step-back" id="backEntry">&larr; Edit entries</button>
+    <div id="captureArea">
+      <div class="card">
+        <div class="section-title" style="color:var(--teal)">Initial data</div>
+        <table class="ledger" id="dataTable"></table>
+      </div>
+      <div class="card accent-plum">
+        <div class="section-title" style="color:var(--plum)">Where everyone stands</div>
+        <div id="excludedNote" class="note" style="display:none">Excluded members are shown above but left out of the split below.</div>
+        <div id="balances"></div>
+      </div>
+      <div class="card accent-gold">
+        <div class="section-title" style="color:var(--gold)">Settle with these payments</div>
+        <div class="total-line" id="unsettledTotalLine" style="display:none; border-top:none; margin-top:0; padding-top:0; margin-bottom:14px;">Total yet to be settled <b id="unsettledTotal">0</b></div>
+        <ul class="tx-list" id="txList"></ul>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title">Share these results</div>
+      <p class="note" style="margin-bottom:14px;">Save everything above as one image or PDF you can send to the group.</p>
+      <div class="actions" style="margin-top:0;">
+        <button id="saveImageBtn">Save as image</button>
+        <button id="savePdfBtn">Save as PDF</button>
+      </div>
+      <p class="note" id="shareStatus" style="margin:10px 0 0;"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+const state = { mode: 'basic', n: 0 };
+
+document.getElementById('pickBasic').onclick = () => { state.mode = 'basic'; goto('stepCount'); };
+document.getElementById('pickAdvanced').onclick = () => { state.mode = 'advanced'; goto('stepCount'); };
+document.getElementById('backMode').onclick = () => goto('stepMode');
+document.getElementById('backCount').onclick = () => goto('stepCount');
+document.getElementById('backEntry').onclick = () => goto('stepEntry');
+
+document.getElementById('homeBtn').onclick = () => goto('stepMode');
+
+function goto(id) {
+  ['stepMode','stepCount','stepEntry','stepResults'].forEach(s => document.getElementById(s).style.display = (s === id ? 'block' : 'none'));
+}
+
+document.getElementById('toEntry').onclick = () => {
+  const n = parseInt(document.getElementById('count').value, 10);
+  if (!n || n < 2) { alert('Enter at least 2 people.'); return; }
+  state.n = n;
+  buildEntryRows(n);
+  goto('stepEntry');
+};
+
+function round1(x) { return Math.round(x * 10) / 10; }
+
+function buildEntryRows(n) {
+  const basicWrap = document.getElementById('basicRows');
+  const advWrap = document.getElementById('advancedRows');
+  basicWrap.innerHTML = ''; advWrap.innerHTML = '';
+
+  if (state.mode === 'basic') {
+    advWrap.style.display = 'none'; basicWrap.style.display = 'block';
+    basicWrap.innerHTML = '<div class="col-labels"><span>Name</span><span>Amount spent</span></div>';
+    for (let i = 0; i < n; i++) {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = `
+        <div class="name"><input type="text" placeholder="Person ${i+1}" class="name-input"></div>
+        <div class="amt"><input type="number" placeholder="0" min="0" step="0.01" class="amt-input"></div>`;
+      basicWrap.appendChild(row);
+    }
+  } else {
+    basicWrap.style.display = 'none'; advWrap.style.display = 'block';
+    const defaultExclWeight = round1(100 / n);
+    for (let i = 0; i < n; i++) {
+      const card = document.createElement('div');
+      card.className = 'person-card';
+      card.dataset.manual = 'false';        // has the included (share-of-remaining) weight been hand-set?
+      card.dataset.inclWeightVal = '0';     // last known included weight, restored if re-included
+      card.dataset.exclManual = 'false';    // has the excluded (share-of-total) weight been hand-set?
+      card.dataset.exclWeightVal = String(defaultExclWeight);
+      card.innerHTML = `
+        <div class="p-grid">
+          <div><label>Name</label><input type="text" placeholder="Person ${i+1}" class="name-input"></div>
+          <div><label>Amount spent</label><input type="number" placeholder="0" min="0" step="0.01" class="amt-input"></div>
+        </div>
+        <div class="p-foot">
+          <div>
+            <label class="weight-label">Weight (share of remaining)</label>
+            <div class="weight-wrap"><input type="number" min="0" step="0.1" value="0" class="weight-input"><span>%</span></div>
+          </div>
+          <div class="switch-wrap">
+            <span class="switch-label incl-label">Included</span>
+            <label class="switch">
+              <input type="checkbox" class="incl-input" checked>
+              <span class="slider-pill"></span>
+            </label>
+          </div>
+        </div>`;
+      advWrap.appendChild(card);
+      const cb = card.querySelector('.incl-input');
+      const lbl = card.querySelector('.incl-label');
+      const wLbl = card.querySelector('.weight-label');
+      const wIn = card.querySelector('.weight-input');
+      cb.addEventListener('change', () => {
+        const nowIncluded = cb.checked;
+        card.classList.toggle('excluded', !nowIncluded);
+        lbl.textContent = nowIncluded ? 'Included' : 'Excluded';
+        wLbl.textContent = nowIncluded ? 'Weight (share of remaining)' : 'Weight (share of total)';
+        if (nowIncluded) {
+          wIn.value = card.dataset.manual === 'true' ? card.dataset.inclWeightVal : 0; // recompute fills auto value
+        } else {
+          wIn.value = card.dataset.exclManual === 'true' ? card.dataset.exclWeightVal : defaultExclWeight;
+        }
+        recomputeWeights();
+      });
+      wIn.addEventListener('input', () => {
+        if (cb.checked) {
+          card.dataset.manual = 'true';
+          card.dataset.inclWeightVal = wIn.value;
+        } else {
+          card.dataset.exclManual = 'true';
+          card.dataset.exclWeightVal = wIn.value;
+        }
+        recomputeWeights();
+      });
+    }
+    recomputeWeights();
+  }
+  const wrap = state.mode === 'basic' ? basicWrap : advWrap;
+  wrap.querySelectorAll('.amt-input').forEach(inp => inp.addEventListener('input', updateTotal));
+  updateTotal();
+}
+
+function recomputeWeights() {
+  const cards = [...document.getElementById('advancedRows').querySelectorAll('.person-card')];
+  const included = cards.filter(c => c.querySelector('.incl-input').checked);
+  const manual = included.filter(c => c.dataset.manual === 'true');
+  const auto = included.filter(c => c.dataset.manual !== 'true');
+  const manualSum = manual.reduce((s, c) => s + (parseFloat(c.querySelector('.weight-input').value) || 0), 0);
+  const leftover = 100 - manualSum;
+  const noteEl = document.getElementById('weightLeftoverNote');
+
+  if (auto.length > 0) {
+    const each = round1(leftover / auto.length);
+    auto.forEach(c => c.querySelector('.weight-input').value = each);
+    noteEl.style.display = 'none';
+  } else if (Math.abs(leftover) > 0.05) {
+    noteEl.style.display = 'block';
+    noteEl.textContent = leftover > 0
+      ? `${round1(leftover)}% of the split is unassigned — no one's weight covers it.`
+      : `Weights add up to ${round1(100 - leftover)}%, which is over 100% by ${round1(-leftover)}%.`;
+  } else {
+    noteEl.style.display = 'none';
+  }
+}
+
+function updateTotal() {
+  const wrap = state.mode === 'basic' ? document.getElementById('basicRows') : document.getElementById('advancedRows');
+  let total = 0;
+  wrap.querySelectorAll('.amt-input').forEach(inp => total += parseFloat(inp.value) || 0);
+  document.getElementById('totalSpent').textContent = total.toFixed(2);
+}
+
+function collectPeople() {
+  const wrap = state.mode === 'basic' ? document.getElementById('basicRows') : document.getElementById('advancedRows');
+  const items = state.mode === 'basic' ? wrap.querySelectorAll('.row') : wrap.querySelectorAll('.person-card');
+  return [...items].map((el, i) => {
+    const name = el.querySelector('.name-input').value.trim() || `Person ${i+1}`;
+    const spent = parseFloat(el.querySelector('.amt-input').value) || 0;
+    if (state.mode === 'basic') return { name, spent, weight: 1, included: true };
+    const weight = parseFloat(el.querySelector('.weight-input').value) || 0;
+    const included = el.querySelector('.incl-input').checked;
+    return { name, spent, weight, included };
+  });
+}
+
+document.getElementById('toResults').onclick = () => {
+  const people = collectPeople();
+  renderResults(people);
+  goto('stepResults');
+};
+
+function renderResults(people) {
+  const showAdvancedCols = state.mode === 'advanced';
+  const grandTotal = people.reduce((s, p) => s + p.spent, 0);
+
+  const included = people.filter(p => p.included);
+  const excluded = people.filter(p => !p.included);
+  const totalIncludedSpent = included.reduce((s, p) => s + p.spent, 0);
+  const weightSumIncluded = included.reduce((s, p) => s + p.weight, 0) || 1;
+
+  // Share: included people split totalIncludedSpent by their share of the included weight pool.
+  // Excluded people never re-enter that pool - their share is worked out against the grand total instead,
+  // purely so their balance can be shown; it isn't collected or paid out.
+  const shareOf = p => p.included
+    ? (p.weight / weightSumIncluded) * totalIncludedSpent
+    : (p.weight / 100) * grandTotal;
+
+  const withBalance = people.map(p => {
+    const share = shareOf(p);
+    return { ...p, share, balance: +(p.spent - share).toFixed(2), wrtTotalPct: round1((p.spent / (grandTotal || 1)) * 100) };
+  });
+
+  const table = document.getElementById('dataTable');
+  table.innerHTML = `
+    <thead><tr>
+      <th>Name</th><th class="num">Spent</th>
+      ${showAdvancedCols ? '<th class="num">Split weight</th><th class="num">Weight (of total)</th><th>Status</th>' : ''}
+    </tr></thead>
+    <tbody>
+      ${withBalance.map(p => `
+        <tr>
+          <td>${p.name}</td>
+          <td class="num">${p.spent.toFixed(2)}</td>
+          ${showAdvancedCols ? `
+            <td class="num">${p.included ? p.weight + '%' : 'NA'}</td>
+            <td class="num">${p.wrtTotalPct}%</td>
+            <td><span class="tag ${p.included ? 'on' : 'off'}">${p.included ? 'Included' : 'Excluded'}</span></td>` : ''}
+        </tr>`).join('')}
+    </tbody>
+    <tfoot><tr><td>Total</td><td class="num">${grandTotal.toFixed(2)}</td>${showAdvancedCols ? '<td></td><td></td><td></td>' : ''}</tr></tfoot>
+  `;
+
+  document.getElementById('excludedNote').style.display = 'none';
+
+  const balancesEl = document.getElementById('balances');
+  balancesEl.innerHTML = '';
+  withBalance.filter(p => p.included).forEach(b => {
+    const row = document.createElement('div');
+    row.className = 'balance-row';
+    const label = b.balance > 0.005 ? 'gets back' : b.balance < -0.005 ? 'owes' : 'settled';
+    const color = b.balance > 0.005 ? 'var(--get)' : b.balance < -0.005 ? 'var(--owe)' : 'var(--muted)';
+    row.innerHTML = `<span>${b.name}</span><span class="amt" style="color:${color}">${label} ${Math.abs(b.balance).toFixed(2)}</span>`;
+    balancesEl.appendChild(row);
+  });
+
+  const settleBalances = withBalance.filter(p => p.included);
+  const creditors = settleBalances.filter(b => b.balance > 0.005).map(b => ({...b})).sort((a,b) => b.balance - a.balance);
+  const debtors = settleBalances.filter(b => b.balance < -0.005).map(b => ({...b, balance: -b.balance})).sort((a,b) => b.balance - a.balance);
+
+  const txns = [];
+  let i = 0, j = 0;
+  while (i < debtors.length && j < creditors.length) {
+    const pay = Math.min(debtors[i].balance, creditors[j].balance);
+    if (pay > 0.005) txns.push({ from: debtors[i].name, to: creditors[j].name, amount: pay });
+    debtors[i].balance -= pay; creditors[j].balance -= pay;
+    if (debtors[i].balance < 0.005) i++;
+    if (creditors[j].balance < 0.005) j++;
+  }
+
+  const txList = document.getElementById('txList');
+  txList.innerHTML = '';
+  const unsettledLine = document.getElementById('unsettledTotalLine');
+  if (txns.length === 0) {
+    txList.innerHTML = '<div class="empty-note">Everyone is already even. Nothing to settle.</div>';
+    unsettledLine.style.display = 'none';
+  } else {
+    const totalToSettle = txns.reduce((s, t) => s + t.amount, 0);
+    document.getElementById('unsettledTotal').textContent = totalToSettle.toFixed(2);
+    unsettledLine.style.display = 'flex';
+    txns.forEach(t => {
+      const li = document.createElement('li');
+      li.className = 'tx';
+      li.innerHTML = `<span>${t.from}</span><span class="arrow">pays &rarr;</span><span>${t.to}</span><span class="amount">${t.amount.toFixed(2)}</span>`;
+      txList.appendChild(li);
+    });
+  }
+}
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[data-src="${src}"]`)) return resolve();
+    const s = document.createElement('script');
+    s.src = src; s.dataset.src = src;
+    s.onload = resolve; s.onerror = () => reject(new Error('load failed'));
+    document.head.appendChild(s);
+  });
+}
+
+async function captureResultsCanvas() {
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+  const el = document.getElementById('captureArea');
+  const bg = getComputedStyle(document.body).backgroundColor;
+  return await html2canvas(el, { backgroundColor: bg, scale: 2 });
+}
+
+async function getDownloads() {
+  if (!window.claude || !window.claude.use) return null;
+  try { return await window.claude.use('downloads'); } catch (e) { return null; }
+}
+
+function browserDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+async function saveFile(blob, filename) {
+  const downloads = await getDownloads();
+  if (downloads) {
+    await downloads.save({ filename, data: blob });
+  } else {
+    browserDownload(blob, filename);
+  }
+}
+
+function setShareStatus(msg) { document.getElementById('shareStatus').textContent = msg; }
+
+document.getElementById('saveImageBtn').onclick = async () => {
+  setShareStatus('Preparing image…');
+  try {
+    const canvas = await captureResultsCanvas();
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+    await saveFile(blob, 'settle-up-summary.png');
+    setShareStatus('Saved.');
+  } catch (e) {
+    setShareStatus(e && e.code === 'declined' ? '' : 'Could not save the image.');
+  }
+};
+
+document.getElementById('savePdfBtn').onclick = async () => {
+  setShareStatus('Preparing PDF…');
+  try {
+    const canvas = await captureResultsCanvas();
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    const { jsPDF } = window.jspdf;
+    const pdfWidth = 210;
+    const pdfHeight = pdfWidth * canvas.height / canvas.width;
+    const pdf = new jsPDF({ unit: 'mm', format: [pdfWidth, pdfHeight] });
+    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pdfWidth, pdfHeight);
+    await saveFile(pdf.output('blob'), 'settle-up-summary.pdf');
+    setShareStatus('Saved.');
+  } catch (e) {
+    setShareStatus(e && e.code === 'declined' ? '' : 'Could not save the PDF.');
+  }
+};
+</script>
+</body>
+</html>
